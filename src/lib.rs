@@ -1,29 +1,73 @@
 use std::error::Error;
 use std::fs;
 use std::env;
+use walkdir::WalkDir;
+use std::fs::metadata;
+
+
+pub enum SearchType{
+    File,
+    Directory,
+}
 
 pub struct Config {
     pub query: String,
     pub filename: String,
     pub case_sensitive:bool,
+    pub search:SearchType,
 }
 
 impl Config {
     pub fn new(args: &[String]) -> Result<Config, &str> {
-        if args.len() < 3 {
+        if args.len() < 4 {
             return Err("not enough arguments");
         }
 
-        let query = args[1].clone();
-        let filename = args[2].clone();
+        let search_type = args[1].clone();
+        let query = args[2].clone();
+        let filename = args[3].clone();
         let case_sensitive = env::var("CASE_INSENSITIVE").is_err();
+        let search;
 
-        Ok(Config { query, filename ,case_sensitive})
+        if search_type == "file"{
+            search = SearchType::File;
+        }else if search_type == "dir"{
+            search = SearchType::Directory;
+        }else{
+            println!("{}",search_type);
+            panic!("Enter valid seach type, please");
+        }
+
+        Ok(Config { query, filename ,case_sensitive,search})
     }
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
-    let contents = fs::read_to_string(config.filename)?;
+    
+    if let SearchType::File = config.search {
+
+        println!("Searching for a file");
+
+        if let Err(e) = search_only_file(config,config.filename){
+            eprintln!("{}",e);
+        }
+    }else{
+        println!("Searching in a directory");
+
+        if let Err(_e)=search_directory(config){
+            eprintln!("Directory search failure");
+        }
+
+    }
+    Ok(())
+}
+
+/*
+Function to search a given string within a file
+*/
+
+pub fn search_only_file(config:Config,path:String) -> Result<(), Box<dyn Error>>{
+    let contents = fs::read_to_string(path)?;
 
     let results = if config.case_sensitive {
         search(&config.query, &contents)
@@ -34,8 +78,22 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     for x in results {
         println!("{}",x);
     }
+
     Ok(())
 }
+
+pub fn search_directory(config:Config) ->Result<(),Box<dyn Error>>{
+    
+    //let paths = fs::read_dir(congif.filename).unwrap();
+    for entry in WalkDir::new(config.filename) {
+        if let Err(_e) = search_only_file(config,entry?.path().display().to_string()){
+
+        }
+    }
+
+    Ok(())
+}
+
 
 pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
     let mut results = Vec::new();
