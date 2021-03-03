@@ -1,3 +1,4 @@
+
 use std::error::Error;
 use std::fs;
 use std::env;
@@ -16,6 +17,8 @@ pub struct Config {
     pub case_sensitive:bool,
     pub search:SearchType,
 }
+
+
 
 impl Config {
     pub fn new(args: &[String]) -> Result<Config, &str> {
@@ -48,14 +51,14 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 
         println!("Searching for a file");
 
-        if let Err(e) = search_only_file(config,config.filename){
+        if let Err(e) = search_only_file(config){
             eprintln!("{}",e);
         }
     }else{
         println!("Searching in a directory");
 
-        if let Err(_e)=search_directory(config){
-            eprintln!("Directory search failure");
+        if let Err(e)=search_directory(&config){
+            eprintln!("Directory search failure , {}",e);
         }
 
     }
@@ -66,8 +69,8 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 Function to search a given string within a file
 */
 
-pub fn search_only_file(config:Config,path:String) -> Result<(), Box<dyn Error>>{
-    let contents = fs::read_to_string(path)?;
+pub fn search_only_file(config:Config) -> Result<(), Box<dyn Error>>{
+    let contents = fs::read_to_string(config.filename)?;
 
     let results = if config.case_sensitive {
         search(&config.query, &contents)
@@ -82,18 +85,35 @@ pub fn search_only_file(config:Config,path:String) -> Result<(), Box<dyn Error>>
     Ok(())
 }
 
-pub fn search_directory(config:Config) ->Result<(),Box<dyn Error>>{
+pub fn search_directory(config:&Config) ->Result<(),Box<dyn Error>>{
     
+    let path = config.filename.clone();
     //let paths = fs::read_dir(congif.filename).unwrap();
-    for entry in WalkDir::new(config.filename) {
-        if let Err(_e) = search_only_file(config,entry?.path().display().to_string()){
+    for entry in WalkDir::new(path) {
+        //let md = metadata(entry?.path()).unwrap();
+        //println!("{}",entry?.path().display());
 
-        }
+        //To-Do :: Differentiate between Dir and File using MetaData, but getting copy error. Need to check
+
+        let contents = fs::read_to_string(entry?.path())?;
+        print_results(config, &contents);
     }
 
     Ok(())
 }
 
+pub fn print_results(config:&Config,contents:&str){
+
+    let results = if config.case_sensitive {
+        search(&config.query, &contents)
+    }else{
+        search_case_insensitive(&config.query, &contents)
+    };
+    
+    for x in results {
+        println!("{}",x);
+    }
+}
 
 pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
     let mut results = Vec::new();
