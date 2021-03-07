@@ -1,16 +1,23 @@
 
+//CRATES
+extern crate term;
+
+use std::path::Path;
 use std::error::Error;
 use std::fs;
 use std::env;
 use walkdir::WalkDir;
-use std::fs::metadata;
 
 
+
+
+//ENUM
 pub enum SearchType{
     File,
     Directory,
 }
 
+//STRUCT
 pub struct Config {
     pub query: String,
     pub filename: String,
@@ -47,18 +54,20 @@ impl Config {
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     
+
     if let SearchType::File = config.search {
 
-        println!("Searching for a file");
+        println!("Searching in a file");
 
         if let Err(e) = search_only_file(config){
             eprintln!("{}",e);
         }
     }else{
+
         println!("Searching in a directory");
 
         if let Err(e)=search_directory(&config){
-            eprintln!("Directory search failure , {}",e);
+            eprintln!("Directory search failure , {} ,{}",e,config.filename);
         }
 
     }
@@ -66,7 +75,7 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 }
 
 /*
-Function to search a given string within a file
+    Function to search a given string within a file
 */
 
 pub fn search_only_file(config:Config) -> Result<(), Box<dyn Error>>{
@@ -77,7 +86,7 @@ pub fn search_only_file(config:Config) -> Result<(), Box<dyn Error>>{
     }else{
         search_case_insensitive(&config.query, &contents)
     };
-    
+
     for x in results {
         println!("{}",x);
     }
@@ -85,23 +94,41 @@ pub fn search_only_file(config:Config) -> Result<(), Box<dyn Error>>{
     Ok(())
 }
 
+/*
+    Function to search a directory for the given text
+*/
+
 pub fn search_directory(config:&Config) ->Result<(),Box<dyn Error>>{
-    
-    let path = config.filename.clone();
-    //let paths = fs::read_dir(congif.filename).unwrap();
-    for entry in WalkDir::new(path) {
-        //let md = metadata(entry?.path()).unwrap();
-        //println!("{}",entry?.path().display());
 
-        //To-Do :: Differentiate between Dir and File using MetaData, but getting copy error. Need to check
-
-        let contents = fs::read_to_string(entry?.path())?;
-        print_results(config, &contents);
+    for entry in WalkDir::new(&config.filename) {
+        match safe_read(entry?.path()) {
+            Ok(contents)=>{
+                print_results(config, &contents);
+            },
+            Err(_e) => {
+                /*
+                This indicates some error in reading the path ""entry" as a FILE.
+                */
+            }
+        }
     }
 
     Ok(())
 }
 
+/*
+    Utility to read contents fo the file and returning error codes,if any
+*/
+
+fn safe_read<P: AsRef<Path>>(file: P)  -> Result<String, std::io::Error> {
+    let mut _data = fs::read_to_string(file)?;
+    Ok(_data)
+}
+
+
+/*
+    Utility function to print lines in files which have the required input
+ */
 pub fn print_results(config:&Config,contents:&str){
 
     let results = if config.case_sensitive {
@@ -109,11 +136,17 @@ pub fn print_results(config:&Config,contents:&str){
     }else{
         search_case_insensitive(&config.query, &contents)
     };
-    
+    let mut found:bool = false;
     for x in results {
         println!("{}",x);
+        found=true;
+    }
+
+    if found {
+        println!("File :: {} \n",config.filename);
     }
 }
+
 
 pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
     let mut results = Vec::new();
@@ -163,6 +196,6 @@ Rust:
 Duct tape is available today.
 ABdUCt him.";
 
-        assert_eq!(vec!["Duct tape is available today.","ABdUCt him."], search_case_insesnsitive(query, contents));
+        assert_eq!(vec!["Duct tape is available today.","ABdUCt him."], search_case_insensitive(query, contents));
     }
 }
